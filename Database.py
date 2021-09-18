@@ -1,7 +1,6 @@
 from Scrapper import CURRENT_TRIMESTER
 import mysql.connector
 from mysql.connector import errorcode
-from mysql.connector.connection import MySQLConnection
 import os
 
 DB_NAME = "assignmenttracker"
@@ -25,15 +24,15 @@ TABLES["assignment"] = (
 )
 
 
-class Database():
+class Database:
     def __init__(self) -> None:
-        self.mydb = mysql.connector.connect(
+        self.conn = mysql.connector.connect(
             host="localhost",
             user=os.getenv('DATABASE_USER'),
-            password=os.getenv('DATABASE_PASSWORD')
+            password=os.getenv('DATABASE_PASSWORD'),
+            database=DB_NAME
         )
-        self.cursor = self.mydb.cursor()
-        self.check_tables_present()
+        self.cursor = self.conn.cursor()
 
     def create_database(self):
         try:
@@ -68,7 +67,6 @@ class Database():
                 self.mydb.database = DB_NAME
             else:
                 print(err)
-                exit(1)
 
         self.cursor.execute(
             f"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '{DB_NAME}'")
@@ -105,13 +103,13 @@ class Database():
                     print(err)
             else:
                 print(f"Course {course['title']} inserted.")
-        self.mydb.commit()
+        self.conn.commit()
 
     def assignment_addition(self, code: int, assignments: list) -> bool:
         try:
             self.cursor.execute(
                 f"SELECT COUNT(*) FROM assignment WHERE course_code ={code}")
-            (assignment_number, ) = self.cursor.fetchone()
+            (assignment_number, ) = self.cursor.fetchall()
         except mysql.connector.Error as err:
             print(err)
         else:
@@ -137,7 +135,7 @@ class Database():
             else:
                 print(
                     f"Assignment {assignment['name']} for course {course_code} added.")
-        self.mydb.commit()
+        self.conn.commit()
 
     def get_courses(self) -> list:
         self.cursor.execute(
@@ -153,7 +151,25 @@ class Database():
             course_list.append(course)
         return course_list
 
+    def get_course_assignments(self, course_code: int) -> tuple:
+        string = f"SELECT id, name, due_date, status FROM assignment WHERE course_code={course_code}"
+        self.cursor.execute(string)
+        results = self.cursor.fetchall()
+        assignments_sub = []
+        assignments_unsub = []
+        for (code, name, due_date, status) in results:
+            details = {
+                "id": code,
+                "name": name,
+                "due_date": due_date
+            }
+            if status == 0:
+                assignments_unsub.append(details)
+            else:
+                assignments_sub.append(details)
+        return (assignments_sub, assignments_unsub)
+
     def __del__(self):
         self.cursor.close()
-        self.mydb.close()
+        self.conn.close()
         print("Connnection Closed.")

@@ -82,7 +82,7 @@ class Scrapper():
             url=f"{ASSIGNMENT_URL}{course_code}/assignments/{assignment_code}/submissions/12921"
         )
         result = result.json()
-        if result == "submitted":
+        if result['workflow_state'] == "submitted":
             return 1
         else:
             return 0
