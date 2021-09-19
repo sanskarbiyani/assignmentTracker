@@ -169,6 +169,20 @@ class Database:
                 assignments_sub.append(details)
         return (assignments_sub, assignments_unsub)
 
+    def update_assignment_status(self, course_id: int, assignment_id: int):
+        string = f"""
+            UPDATE assignment
+            SET status=1
+            WHERE course_code={course_id} AND id={assignment_id}
+        """
+        try:
+            self.cursor.execute(string)
+        except mysql.connector.Error as err:
+            print(err)
+            return err.errno
+        else:
+            return 0
+
     def __del__(self):
         self.cursor.close()
         self.conn.close()

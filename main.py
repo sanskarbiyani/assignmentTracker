@@ -1,6 +1,6 @@
 from pprint import pprint
 
-from mysql.connector.constants import ServerFlag
+from mysql.connector.constants import ServerFlag, flag_is_set
 from Scrapper import Scrapper
 from Database import Database
 import sys
@@ -44,15 +44,17 @@ class MainWindow(QMainWindow):
         # self.setCentralWidget(label)
 
         self.course_list = mydatabase.get_courses()
-        toobar = Toolbar("Main Toolbar", self.course_list)
-        toobar.update_courses_button.triggered.connect(
+        self.toobar = Toolbar("Main Toolbar", self.course_list)
+        self.toobar.update_courses_button.triggered.connect(
             self.on_update_course_button_click)
-        toobar.get_assignments_button.triggered.connect(
+        self.toobar.get_assignments_button.triggered.connect(
             self.on_get_assignment_button_click)
-        toobar.update_assignment_list.triggered.connect(
+        self.toobar.update_assignment_list.triggered.connect(
             self.update_all_assignments)
-        toobar.quit_button.triggered.connect(self.quit_application)
-        self.addToolBar(toobar)
+        self.toobar.quit_button.triggered.connect(self.quit_application)
+        self.toobar.check_assignment_status.triggered.connect(
+            self.check_assignment_status)
+        self.addToolBar(self.toobar)
         self.setStatusBar(QStatusBar(self))
 
         self.tab_widget = MyTabWidget(course_list=self.course_list)
@@ -80,27 +82,64 @@ class MainWindow(QMainWindow):
         if not self.tab_widget.currentWidget().have_sub_tabs:
             (submitted, unsubmitted) = mydatabase.get_course_assignments(
                 self.course_list[index]['code'])
-            self.sub_tabs = MyTabWidget(
+            self.tab_widget.currentWidget().sub_tab = MyTabWidget(
                 submitted=submitted, unsubmitted=unsubmitted)
             current_layout = self.tab_widget.currentWidget().layout()
             widget = current_layout.itemAt(0)
             current_layout.removeItem(widget)
-            self.tab_widget.currentWidget().layout().addWidget(self.sub_tabs)
+            self.tab_widget.currentWidget().layout().addWidget(
+                self.tab_widget.currentWidget().sub_tab)
             self.tab_widget.currentWidget().have_sub_tabs = True
-            self.sub_tabs.d["unsubmitted"].itemClicked.connect(
+            self.tab_widget.currentWidget().sub_tab.d["unsubmitted"].itemClicked.connect(
                 self.list_item_clicked)
-            self.sub_tabs.d["submitted"].itemClicked.connect(
+            self.tab_widget.currentWidget().sub_tab.d["submitted"].itemClicked.connect(
                 self.list_item_clicked)
+            self.tab_widget.currentWidget().sub_tab.currentChanged.connect(
+                self.sub_tabs_changed)
             self.course_list[index]['submitted'] = submitted
             self.course_list[index]['unsubmitted'] = unsubmitted
+        else:
+            index = self.tab_widget.currentWidget().sub_tab.indexOf(
+                self.tab_widget.currentWidget().sub_tab.currentWidget())
+            self.deselect_item(index)
 
     def list_item_clicked(self, item):
-        course_index = self.tab_widget.indexOf(self.tab_widget.currentWidget())
-        status_index = self.sub_tabs.indexOf(self.sub_tabs.currentWidget())
+        course_index = self.tab_widget.indexOf(
+            self.tab_widget.currentWidget())
+        self.course_id = self.course_list[course_index]['code']
+        status_index = self.tab_widget.currentWidget().sub_tab.indexOf(
+            self.tab_widget.currentWidget().sub_tab.currentWidget())
         if status_index == 0:
-            row = self.sub_tabs.d["unsubmitted"].row(item)
+            row = self.tab_widget.currentWidget(
+            ).sub_tab.d["unsubmitted"].row(item)
+            self.assignment_id = self.course_list[course_index]['unsubmitted'][row]["id"]
         else:
-            row = self.sub_tabs.d["submitted"].row(item)
+            row = self.tab_widget.currentWidget(
+            ).sub_tab.d["submitted"].row(item)
+            self.assignment_id = self.course_list[course_index]['submitted'][row]["id"]
+
+    def deselect_item(self, index):
+        list_widget = self.tab_widget.currentWidget().sub_tab
+        if index == 0:
+            list_widget.d["unsubmitted"].currentItem().setSelected(False)
+        else:
+            list_widget.d["submitted"].currentItem().setSelected(False)
+
+    def sub_tabs_changed(self, index):
+        if index == 0:
+            self.toobar.check_assignment_status.setEnabled(True)
+        else:
+            self.toobar.check_assignment_status.setDisabled(True)
+        self.deselect_item(index)
+
+    def check_assignment_status(self):
+        status = course_scrapper.get_submission_status(
+            self.course_id, self.assignment_id)
+        if status == 1:
+            error = mydatabase.update_assignment_status(
+                self.course_id, self.assignment_id)
+            if not error:
+                pass
 
     def quit_application(self):
         app.quit()

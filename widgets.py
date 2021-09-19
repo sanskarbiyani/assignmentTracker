@@ -27,6 +27,13 @@ class Toolbar(QToolBar):
         self.quit_button.setStatusTip("Quit Application")
         self.addAction(self.quit_button)
 
+        self.addSeparator()
+
+        self.check_assignment_status = QAction("Check status", self)
+        self.check_assignment_status.setStatusTip(
+            "Check the status of the current assignment.")
+        self.addAction(self.check_assignment_status)
+
 
 class MyTabWidget(QTabWidget):
     def __init__(self, **kwargs):
@@ -43,6 +50,7 @@ class MyTabWidget(QTabWidget):
                 layout.addWidget(label)
                 self.tab.setLayout(layout)
                 self.addTab(self.tab, course['name'])
+                self.tab.sub_tab = None
 
         # For creating the sub tab list
         # Will be creating when called from tab_changed() in MainWindow.
