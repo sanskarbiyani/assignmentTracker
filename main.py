@@ -64,6 +64,7 @@ class MainWindow(QMainWindow):
         widget.setLayout(layout)
         self.setCentralWidget(widget)
         self.tab_changed(self.tab_widget.currentIndex())
+        self.selected_list_item = None
 
     def on_update_course_button_click(self):
         status = update_course()
@@ -101,9 +102,12 @@ class MainWindow(QMainWindow):
         else:
             index = self.tab_widget.currentWidget().sub_tab.indexOf(
                 self.tab_widget.currentWidget().sub_tab.currentWidget())
-            self.deselect_item(index)
+            print(index)
+            self.deselect_item()
 
     def list_item_clicked(self, item):
+        self.selected_list_item = item
+        print(type(self.selected_list_item))
         course_index = self.tab_widget.indexOf(
             self.tab_widget.currentWidget())
         self.course_id = self.course_list[course_index]['code']
@@ -118,19 +122,30 @@ class MainWindow(QMainWindow):
             ).sub_tab.d["submitted"].row(item)
             self.assignment_id = self.course_list[course_index]['submitted'][row]["id"]
 
-    def deselect_item(self, index):
-        list_widget = self.tab_widget.currentWidget().sub_tab
-        if index == 0:
-            list_widget.d["unsubmitted"].currentItem().setSelected(False)
-        else:
-            list_widget.d["submitted"].currentItem().setSelected(False)
+    # This method de-selects the selected item on the next turn when the tab is clicked
+    # As the currentItem() and currentWidget() returns the new widget not the old ones.
+    # def deselect_item(self, index):
+    #     list_widget = self.tab_widget.currentWidget().sub_tab
+    #     if index == 0:
+    #         item = list_widget.d["unsubmitted"].currentItem()
+    #         if not item:
+    #             return
+    #     else:
+    #         item = list_widget.d["submitted"].currentItem()
+    #         if not item:
+    #             return
+    #     item.setSelected(False)
+
+    def deselect_item(self):
+        if self.selected_list_item:
+            self.selected_list_item.setSelected(False)
 
     def sub_tabs_changed(self, index):
         if index == 0:
             self.toobar.check_assignment_status.setEnabled(True)
         else:
             self.toobar.check_assignment_status.setDisabled(True)
-        self.deselect_item(index)
+        self.deselect_item()
 
     def check_assignment_status(self):
         status = course_scrapper.get_submission_status(
