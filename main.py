@@ -1,4 +1,5 @@
 from pprint import pprint
+from re import sub
 
 from mysql.connector.constants import ServerFlag, flag_is_set
 from Scrapper import Scrapper
@@ -100,26 +101,20 @@ class MainWindow(QMainWindow):
             self.course_list[index]['submitted'] = submitted
             self.course_list[index]['unsubmitted'] = unsubmitted
         else:
-            index = self.tab_widget.currentWidget().sub_tab.indexOf(
-                self.tab_widget.currentWidget().sub_tab.currentWidget())
-            print(index)
             self.deselect_item()
 
     def list_item_clicked(self, item):
         self.selected_list_item = item
-        print(type(self.selected_list_item))
-        course_index = self.tab_widget.indexOf(
-            self.tab_widget.currentWidget())
+        course = self.tab_widget.currentWidget()
+        course_index = self.tab_widget.indexOf(course)
         self.course_id = self.course_list[course_index]['code']
-        status_index = self.tab_widget.currentWidget().sub_tab.indexOf(
-            self.tab_widget.currentWidget().sub_tab.currentWidget())
+        status_index = course.sub_tab.indexOf(course.sub_tab.currentWidget())
         if status_index == 0:
-            row = self.tab_widget.currentWidget(
-            ).sub_tab.d["unsubmitted"].row(item)
+            row = course.sub_tab.d["unsubmitted"].row(item)
+            print(f"Row from list_item_clicked: {row}", end='\n\n')
             self.assignment_id = self.course_list[course_index]['unsubmitted'][row]["id"]
         else:
-            row = self.tab_widget.currentWidget(
-            ).sub_tab.d["submitted"].row(item)
+            row = course.sub_tab.d["submitted"].row(item)
             self.assignment_id = self.course_list[course_index]['submitted'][row]["id"]
 
     # This method de-selects the selected item on the next turn when the tab is clicked
@@ -147,14 +142,44 @@ class MainWindow(QMainWindow):
             self.toobar.check_assignment_status.setDisabled(True)
         self.deselect_item()
 
+    # For checking the status of a particular assignment
+    # We check it's status and try to update the databases is status is 1
+    # If database updated successfully, than we remove the element from the unsubmitted list
+    # and add it to the submitted list.
+
+    # After deleting the element at the last row, we would check the second last element
+    # to see if it exists, if it does then we update the course and assignment id
+    # if not, than we disable the button.
     def check_assignment_status(self):
         status = course_scrapper.get_submission_status(
             self.course_id, self.assignment_id)
+        print("Inside.")
         if status == 1:
             error = mydatabase.update_assignment_status(
                 self.course_id, self.assignment_id)
-            if not error:
-                pass
+            if error:
+                print("Check above.")
+            else:
+                sub_tab = self.tab_widget.currentWidget().sub_tab
+                row = sub_tab.d['unsubmitted'].row(self.selected_list_item)
+                index = self.tab_widget.indexOf(
+                    self.tab_widget.currentWidget())
+                assignment = self.course_list[index]['unsubmitted'].pop(row)
+                self.course_list[index]['submitted'].append(assignment)
+                sub_tab.d["unsubmitted"].takeItem(row)
+                sub_tab.d["submitted"].addItem(self.selected_list_item)
+                self.selected_list_item = sub_tab.d['unsubmitted'].item(row)
+                print(f"Row from check status: {row}")
+                if self.selected_list_item is not None:
+                    self.selected_list_item.setSelected(True)
+                    self.list_item_clicked(self.selected_list_item)
+                else:
+                    self.selected_list_item = sub_tab.d['unsubmitted'].item(
+                        row-1)
+                    if self.selected_list_item is not None:
+                        self.list_item_clicked(self.selected_list_item)
+                    else:
+                        self.toobar.check_assignment_status.setDisabled(True)
 
     def quit_application(self):
         app.quit()

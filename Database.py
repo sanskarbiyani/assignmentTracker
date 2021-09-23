@@ -179,8 +179,9 @@ class Database:
             self.cursor.execute(string)
         except mysql.connector.Error as err:
             print(err)
-            return err.errno
+            return 1
         else:
+            self.conn.commit()
             return 0
 
     def __del__(self):
